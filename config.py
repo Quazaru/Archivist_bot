@@ -6,3 +6,6 @@ PSQL_USER = "postgres"
 PSQL_PASSWORD = "LovareSQL2023"
 PSQL_DB_NAME = "Archivist_db"
 PSQL_PORT = 5432
+
+# other
+MAIN_COLLECTION_ID = ""

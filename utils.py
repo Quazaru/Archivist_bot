@@ -1,19 +1,8 @@
 import config
 import psycopg2
 
-def add_note(collection_id, user_id, note_text):
-    """
-    Функция для добавления заметки в таблицу Notes.
-
-    Параметры:
-    - collection_id: ID коллекции, к которой привязана заметка.
-    - user_id: ID пользователя, создавшего заметку.
-    - note_text: Текст заметки.
-
-    Добавляет новую заметку в таблицу Notes с указанными данными.
-    """
+def add_note(collection_name, user_id, note_text, name="Untilted"):
     try:
-        # Соединение с базой данных
         connection = psycopg2.connect(
             host=config.PSQL_HOST,
             user=config.PSQL_USER,
@@ -21,26 +10,28 @@ def add_note(collection_id, user_id, note_text):
             database=config.PSQL_DB_NAME,
         )
 
-        # Вставка заметки
         with connection.cursor() as cursor:
             cursor.execute("""
-                INSERT INTO Notes (CollectionID, UserID, NoteText, CreationDate, LastModifiedDate)
-                VALUES (%s, %s, %s, CURRENT_DATE, CURRENT_DATE)
-            """, (collection_id, user_id, note_text))
-            
-        # Подтверждение изменений в базе данных
+                INSERT INTO Notes (CollectionID, UserID, NoteText, Name)
+                SELECT 
+                    COALESCE((SELECT CollectionID FROM Collections WHERE Name = %s LIMIT 1), 1) AS CollectionID,
+                    %s,
+                    %s,
+                    %s
+                ON CONFLICT DO NOTHING;
+            """, (collection_name, user_id, note_text, name))
+
         connection.commit()
-        print("Заметка успешно добавлена!")
+        print("Note added successfully!")
 
     except psycopg2.Error as error:
-        print("Ошибка при работе с PostgreSQL:", error)
+        print("Error adding note:", error)
 
     finally:
-        # Закрытие соединения
         if connection:
             connection.close()
 
-def get_note_by_id(note_id):
+def get_collections_by_name(collection_name):
     try:
         connection = psycopg2.connect(
             host=config.PSQL_HOST,
@@ -51,72 +42,20 @@ def get_note_by_id(note_id):
 
         with connection.cursor() as cursor:
             cursor.execute("""
-                SELECT * FROM Notes WHERE NoteID = %s
-            """, (note_id,))
-            note_data = cursor.fetchone()
-            if note_data:
-                return note_data
-            else:
-                return None
+                SELECT * FROM Collections WHERE Name = %s
+            """, (collection_name,))
+            collections = cursor.fetchall()
+            return collections
 
     except psycopg2.Error as error:
-        print("Ошибка при работе с PostgreSQL:", error)
+        print("Error fetching collections:", error)
         return None
 
     finally:
         if connection:
             connection.close()
 
-def create_collection(user_id, author_username, creation_date):
-    try:
-        connection = psycopg2.connect(
-            host=config.PSQL_HOST,
-            user=config.PSQL_USER,
-            password=config.PSQL_PASSWORD,
-            database=config.PSQL_DB_NAME,
-        )
-
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                INSERT INTO Collections (UserID, AuthorUsername, CreationDate)
-                VALUES (%s, %s, %s)
-            """, (user_id, author_username, creation_date))
-            
-        connection.commit()
-        print("Коллекция успешно создана!")
-
-    except psycopg2.Error as error:
-        print("Ошибка при работе с PostgreSQL:", error)
-
-    finally:
-        if connection:
-            connection.close()
-
-def get_notes_in_collection(collection_id):
-    try:
-        connection = psycopg2.connect(
-            host=config.PSQL_HOST,
-            user=config.PSQL_USER,
-            password=config.PSQL_PASSWORD,
-            database=config.PSQL_DB_NAME,
-        )
-
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                SELECT NoteID FROM Notes WHERE CollectionID = %s
-            """, (collection_id,))
-            notes_ids = cursor.fetchall()
-            return [note[0] for note in notes_ids]
-
-    except psycopg2.Error as error:
-        print("Ошибка при работе c PostgreSQL:", error)
-        return None
-
-    finally:
-        if connection:
-            connection.close()
-
-def get_user_collections(user_id):
+def get_collection_list(user_id):
     try:
         connection = psycopg2.connect(
             host=config.PSQL_HOST,
@@ -129,22 +68,19 @@ def get_user_collections(user_id):
             cursor.execute("""
                 SELECT * FROM Collections WHERE UserID = %s
             """, (user_id,))
-            user_collections = cursor.fetchall()
-            return user_collections
+            collections = cursor.fetchall()
+            return collections
 
     except psycopg2.Error as error:
-        print("Ошибка при работе с PostgreSQL:", error)
+        print("Error fetching collections:", error)
         return None
 
     finally:
         if connection:
             connection.close()
 
-
-def init_archivist_database():
-    
+def get_notes(collection_id):
     try:
-        # connect to exist db
         connection = psycopg2.connect(
             host=config.PSQL_HOST,
             user=config.PSQL_USER,
@@ -152,85 +88,59 @@ def init_archivist_database():
             database=config.PSQL_DB_NAME,
         )
 
-        # the cursor for performing database operations
-        # curson = connection.cursor()
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT * FROM Notes WHERE CollectionID = %s
+            """, (collection_id,))
+            notes = cursor.fetchall()
+            return notes
+
+    except psycopg2.Error as error:
+        print("Error fetching notes:", error)
+        return None
+
+    finally:
+        if connection:
+            connection.close()
+
+def init_archivist_database():
+    try:
+        # connect to existing db
+        connection = psycopg2.connect(
+            host=config.PSQL_HOST,
+            user=config.PSQL_USER,
+            password=config.PSQL_PASSWORD,
+            database=config.PSQL_DB_NAME,
+        )
 
         with connection.cursor() as cursor:
-            cursor.execute(
-                "SELECT version();"
-            )
+            cursor.execute("""
+                SELECT version();
+            """)
             print(f"Server version: {cursor.fetchone()}")
-            
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                CREATE TYPE FileType AS ENUM ('image', 'audio', 'video')
-            """)
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS Users (
-                    UserID SERIAL PRIMARY KEY,
-                    Username VARCHAR(50) NOT NULL
-                    -- Другие поля пользователя
-                )
-            """)
+
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS Collections (
                     CollectionID SERIAL PRIMARY KEY,
-                    UserID INT REFERENCES Users(UserID),
-                    AuthorUsername VARCHAR(50) NOT NULL,
-                    CreationDate DATE
-                    -- Другие поля коллекции
-                )
-            """)
-            cursor.execute("""
+                    UserID VARCHAR(50) NOT NULL,
+                    Name VARCHAR(50) NOT NULL
+                );
+
                 CREATE TABLE IF NOT EXISTS Notes (
                     NoteID SERIAL PRIMARY KEY,
                     CollectionID INT REFERENCES Collections(CollectionID),
-                    UserID INT REFERENCES Users(UserID),
+                    UserID VARCHAR(50) NOT NULL,
                     NoteText TEXT,
-                    ParentNoteID INT,
-                    CreationDate DATE,
-                    LastModifiedDate DATE
-                    -- Другие поля заметки
-                )
+                    Name VARCHAR(50) NOT NULL
+                );
+
+                INSERT INTO Collections (UserID, Name)
+                VALUES ('1', 'Base Collection');
+                        
             """)
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS NoteFiles (
-                    FileID SERIAL PRIMARY KEY,
-                    NoteID INT REFERENCES Notes(NoteID),
-                    FileType FileType
-                    -- Другие поля файлов заметки
-                )
-            """)
-            
-        # Подтверждение изменений в базе данных
-        connection.commit()     
-        #     # connection.commit()
-        #     print("[INFO] Table created successfully")
-            
-        # insert data into a table
-        # with connection.cursor() as cursor:
-        #     cursor.execute(
-        #         """INSERT INTO users (first_name, nick_name) VALUES
-        #         ('Oleg', 'barracuda');"""
-        #     )
-            
-        #     print("[INFO] Data was succefully inserted")
-            
-        # get data from a table
-        # with connection.cursor() as cursor:
-        #     cursor.execute(
-        #         """SELECT nick_name FROM users WHERE first_name = 'Oleg';"""
-        #     )
-            
-        #     print(cursor.fetchone())
-            
-        # delete a table
-        # with connection.cursor() as cursor:
-        #     cursor.execute(
-        #         """DROP TABLE users;"""
-        #     )
-            
-        #     print("[INFO] Table was deleted")
+
+        connection.commit()
+        print("[INFO] Tables created successfully")
     except Exception as _ex:
         print("[INFO] Error while launching PostgreSQL", _ex)
     finally:
