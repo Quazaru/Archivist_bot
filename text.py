@@ -1,4 +1,4 @@
-greet = "<b style=\"color: red;\"> Добро пожаловать в Архив 😊 </b>"
+greet = "<b> Добро пожаловать в Архив, {user} 😊 </b>"
 menu = "⭕ Главное меню "
 back_to_menu = "◀ Перейти в меню"
 
@@ -13,4 +13,9 @@ view_collection_list = "Ваши коллекции:"
 
 # СЛУЖЕБНЫЕ
 still_developing = "Эта функция откроется позже.."
-
+## INFO ##
+info_database_created = "[INFO] Tables created successfully"
+info_database_error = "[ERROR] Error while launching PostgreSQL: {error}"
+info_database_closed = "[INFO] PostgreSQL connection closed"
+info_notes_error = "Error fetching notes: {error}"
+info_colletions_error = "Error fetching collections: {error}"

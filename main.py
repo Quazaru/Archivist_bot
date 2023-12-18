@@ -13,21 +13,29 @@ import psycopg2
 # local files
 import config
 from handlers import router
-import utils
+import utils_sql
 
+db_handler = None
+db_connected = False
+try:
+    db_handler = utils_sql.DBHandler()
+    db_connected = True
+except:
+    print("[ERROR] DBHandler error! Unable to connect to the database.")
 
-# SQL handle
-utils.init_archivist_database();
+if db_connected:
+    # В случае успешного подключения к базе данных запускаем бота
+    db_handler.database_init()
+    async def main():
+        bot = Bot(token=config.BOT_TOKEN, parse_mode=ParseMode.HTML)
+        dp = Dispatcher(storage=MemoryStorage())
+        dp.include_router(router) 
+        await bot.delete_webhook(drop_pending_updates=True)
+        await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
 
-# Telegram handle
-async def main():
-    bot = Bot(token=config.BOT_TOKEN, parse_mode=ParseMode.HTML) # HTML для корректной разметки
-    dp = Dispatcher(storage=MemoryStorage()) # Всё, что не добавили в бд - чистим
-    dp.include_router(router) 
-    await bot.delete_webhook(drop_pending_updates=True)
-    await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
-
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    asyncio.run(main())
+    if __name__ == "__main__":
+        logging.basicConfig(level=logging.INFO)
+        asyncio.run(main())
+else:
+    # В случае неудачного подключения к базе данных выходим из программы
+    print("[ERROR] Bot cannot be started due to failed database connection.")
