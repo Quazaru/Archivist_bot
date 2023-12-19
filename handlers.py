@@ -14,14 +14,35 @@ from aiogram import html
 
 import kb
 import text
-import utils_sql
 import states
-import config
+import queries_sql
 from utils_sql import DBHandler
 router = Router()
 db_handler = DBHandler()
 
-# Функции записи данных
+# Файлы
+@router.message(F.sticker)
+@router.message(F.animation)
+@router.message(F.photo)
+@router.message(F.voice)
+@router.message(F.photo)
+async def still_developing(msg: Message):
+    
+    await msg.answer("Обработка такого формата ещё в разработке 💀💀💀", reply_markup=kb.iexit_kb)
+
+# Коллекции 
+@router.callback_query(F.data == "view_collection_list")
+async def view_collection_list(clbck: CallbackQuery):
+    user_id = clbck.from_user.id  
+
+    collections = db_handler.table_select("Collections", ("UserID", "=", user_id))
+    if not collections:
+        await clbck.message.answer("У вас нет доступных коллекций.")
+    result_message = "<b>Ваши коллекции:</b> \n" 
+    for idx, collection in enumerate(collections):
+        result_message += f"\n<b>[{idx+1}] -></b> {html.quote(collection["Name"])}" 
+    await clbck.message.edit_text(result_message, reply_markup=kb.sorting_menu)
+        
 @router.callback_query(F.data == "add_collection") #####
 async def add_collection(clbck: CallbackQuery, state: FSMContext):
     await clbck.message.answer(text.add_collection, reply_markup=kb.iexit_kb) 
@@ -37,10 +58,47 @@ async def add_collection_handler(msg: Message, state: FSMContext):
         "CreationTime": creation_time,
         "UserID": user_id
     })
-
     await state.clear()
-    await msg.answer(f"Collection `{collection_name}` created by {msg.from_user.full_name}", reply_markup=kb.iexit_kb) 
+    await msg.answer(f"Collection `{html.quote(collection_name)}` created by {html.quote(msg.from_user.full_name)}", reply_markup=kb.iexit_kb) 
+@router.callback_query(F.data == "collections_sort_by_name")
+async def collections_sort_by_name(mag: Message):
+    user_id = mag.from_user.id  
+    collections = db_handler.table_select_new("Collections", ("UserID", "=", user_id), "Name", False)
+    if not collections:
+        await mag.message.answer("У вас нет доступных коллекций.")
+    result_message = "<b>Ваши коллекции:</b> \n" 
+    for idx, collection in enumerate(collections):
+        result_message += f"\n<b>[{idx+1}] -></b> {html.quote(collection["Name"])}" 
+    await mag.message.edit_text(result_message, reply_markup=kb.sorting_menu)
 
+@router.callback_query(F.data == "collections_sort_by_creationDate")
+async def collections_sort_by_name(mag: Message):
+    user_id = mag.from_user.id  
+    collections = db_handler.table_select_new("Collections", ("UserID", "=", user_id), "CollectionID", False)
+    if not collections:
+        await mag.message.answer("У вас нет доступных коллекций.")
+    result_message = "<b>Ваши коллекции:</b> \n" 
+    for idx, collection in enumerate(collections):
+        result_message += f"\n<b>[{idx+1}] -></b> {html.quote(collection["Name"])}" 
+    await mag.message.edit_text(result_message, reply_markup=kb.sorting_menu)
+
+
+
+# Заметки
+@router.callback_query(F.data == "view_note_list")
+async def view_note(clbck: CallbackQuery):
+    user_id = clbck.from_user.id
+    notes = db_handler.table_select_all("Notes")
+
+    if not notes:
+        await clbck.message.edit_text("Нет доступных заметок для этой коллекции.", reply_markup=kb.iexit_kb)
+        return
+    result_message = "Ваши заметки: \n"
+    for idx, note in enumerate(notes):
+        result_message += f"->{idx+1}. <b>{note["Name"]}</b>\n"
+        result_message += f"{note["NoteText"]}\n\n"
+
+    await clbck.message.edit_text(result_message, reply_markup=kb.iexit_kb)
 
 @router.callback_query(F.data == "add_note")
 async def add_note(clbck: CallbackQuery, state: FSMContext):
@@ -60,53 +118,15 @@ async def add_note_handler(msg: Message, state: FSMContext):
         "CollectionID": collection_id,
     })
     await state.clear()
-    await msg.answer("Заметка успешно сохранена!")
     await msg.answer(text.menu, reply_markup=kb.menu)
 
-# Функции просмотра даных
-@router.callback_query(F.data == "view_note_list")
-async def view_note(clbck: CallbackQuery):
-    user_id = clbck.from_user.id
-    notes = db_handler.table_select_all("Notes")
-
-    if not notes:
-        await clbck.message.answer("Нет доступных заметок для этой коллекции.")
-        return
-    result_message = "Ваши заметки: \n"
-    for idx, note in enumerate(notes):
-        result_message += f"->{idx}. <b>{note["Name"]}</b>\n"
-        result_message += f"{note["NoteText"]}\n\n"
-
-    await clbck.message.answer(result_message, reply_markup=kb.iexit_kb)
-
-        
-@router.callback_query(F.data == "view_collection_list")
-async def view_collection_list(clbck: CallbackQuery):
-    user_id = "1"  
-
-    collections = utils_sql.get_collection_list(user_id)
-
-    if collections:
-        buttons = [
-            InlineKeyboardButton(
-                text=collection[2],  
-                callback_data=f"view_collection_{collection[0]}" 
-            )
-            for collection in collections
-        ]
-
-        rows = [buttons[i:i + 1] for i in range(0, len(buttons), 1)]  
-
-        keyboard = InlineKeyboardMarkup(inline_keyboard=rows)
-        await clbck.message.answer("Выберите коллекцию:", reply_markup=keyboard)
-    else:
-        await clbck.message.answer("У вас нет доступных коллекций.")
 
 
 
 # Навигация по меню
 @router.message(Command("start"))
 async def start_handler(msg: Message):
+    # инициализация нового пользователя
     tg_userID = msg.from_user.id
     if not db_handler.table_select("Users", ("UserID", "=", tg_userID)):
         db_handler.table_insert("Users", {"UserID": tg_userID, "SelectedCollectionID": 1})
@@ -116,18 +136,18 @@ async def start_handler(msg: Message):
     print(" PRINT DB \n")
     print(db_handler.table_select_all("users"))
     print(db_handler.table_select_all("collections"))
+    print(" TESTING SQL \n\n\n\n")
+    print(queries_sql.QueryHelper.generate_query_select_new())
     await msg.answer(text.greet.format(user=html.quote(msg.from_user.full_name)), reply_markup=kb.menu)
 
 
 
 @router.callback_query(F.data == "back_to_menu")
 async def back_to_menu(clbck: CallbackQuery):
-    await clbck.message.answer(text.menu, reply_markup=kb.menu)
-@router.message(F.text == "Меню")
-@router.message(F.text == "меню")
-async def menu(msg: Message):
-    await msg.answer(text.menu, reply_markup=kb.menu)
-    userId = await msg.from_user.id
-    config.MAIN_COLLECTION_ID = userId
+    user_id = clbck.from_user.id
+    SelectedCollectionID = db_handler.table_select("Users", ("UserID", "=", user_id))[0]["SelectedCollectionID"]
+    SelectedCollectionName = db_handler.table_select("Collections", ("CollectionID", "=", SelectedCollectionID))[0]["Name"]
+    await clbck.message.edit_text(text.menu.format(html.quote(CollectionName=SelectedCollectionName)), reply_markup=kb.menu)
+
 
     

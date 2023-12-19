@@ -74,12 +74,19 @@ class QueryHelper:
     query_select = """
             SELECT * FROM {0} WHERE {1};
                 """
+    query_select_template = """
+            SELECT * FROM {0}
+                """
+    query_select_sorted = """
+            SELECT * FROM {0} ORDER BY {1} {2};
+                """
     query_update = """
             UPDATE {0} SET {1} WHERE {2};
                 """
     query_delete = """
             DELETE {0} WHERE {1};
                 """
+    
     
     def generate_query_insert(self, tableName, insert_dict):
         """
@@ -103,6 +110,25 @@ class QueryHelper:
         columnValues = ', '.join(f"'{value}'" if isinstance(value, str) else str(value) for value in insert_dict.values())
         query_insert = self.query_insert.format(tableName, columnNames, columnValues)
         return query_insert
+
+    ###    
+    def generate_query_select_new(self, tableName, condition_tuple=(), orderByField="", isDESC=False):
+        """
+        Функция для генерации SQL-запроса SELECT с дополнительными параметрами
+        Принимает аргументы:
+          - tableName: имя таблицы для запроса
+          - condition_tuple: кортеж условий вида ("fieldName", "operator", fieldValue) | (по умолчанию пустой)
+          - orderByField: поле для сортировки (по умолчанию пустая строка)
+          - isDESC: флаг сортировки в порядке убывания (по умолчанию False)
+          """
+        query = self.query_select_template.format({tableName})
+        if(condition_tuple):
+            query += " WHERE " + self.getConditionStr(condition_tuple=condition_tuple)
+        if(orderByField):
+            DESC = "DESC" if isDESC else ""
+            query+= " ORDER BY {orderByField} {DESC}"
+        return query+";"
+    ###
     def generate_query_select(self, tableName, condition_tuple):
         """
         Создает строку запроса SELECT для выборки данных из указанной таблицы с условием.

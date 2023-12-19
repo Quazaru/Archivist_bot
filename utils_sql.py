@@ -69,6 +69,8 @@ class DBHandler:
                 result_dict[column_name] = value if isinstance(value, (int, float)) else str(value)
             results.append(result_dict)
         return results
+    def table_select_new(self, table_name, condition_tuple, orderByField, isDESC):
+        pass
     def table_select_all(self, table_name) -> list[dict]:
         self._cursor.execute(f"SELECT * FROM {table_name}")
         rows = self._cursor.fetchall()
@@ -89,90 +91,3 @@ class DBHandler:
         query = self._queryHelper.generate_query_delete(table_name, condition_tuple)
         self._cursor.execute(query)
         self._connection.commit()   
-
-        
-def add_note(collection_name, creation_time, note_text, name="Untilted"):
-    try:
-        connection = psycopg2.connect(
-            host=config.PSQL_HOST,
-            user=config.PSQL_USER,
-            password=config.PSQL_PASSWORD,
-            database=config.PSQL_DB_NAME,
-        )
-
-        with connection.cursor() as cursor:
-            cursor.execute(queries_sql.query_notes_insert.format(CollectionName=collection_name, CreationTime=creation_time, NoteText = note_text, NoteName=name))
-
-        connection.commit()
-        print("Note added successfully!")
-
-    except psycopg2.Error as error:
-        print("Error adding note:", error)
-
-    finally:
-        if connection:
-            connection.close()
-
-def get_collections_by_name(collection_name):
-    try:
-        connection = psycopg2.connect(
-            host=config.PSQL_HOST,
-            user=config.PSQL_USER,
-            password=config.PSQL_PASSWORD,
-            database=config.PSQL_DB_NAME,
-        )
-
-        with connection.cursor() as cursor:
-            cursor.execute(queries_sql.query_collections_select_ByName.format(collection_name))
-            collections = cursor.fetchall()
-            return collections
-
-    except psycopg2.Error as error:
-        print("Error fetching collections:", error)
-        return None
-
-    finally:
-        if connection:
-            connection.close()
-
-def get_collection_list(user_id):
-    try:
-        connection = psycopg2.connect(
-            host=config.PSQL_HOST,
-            user=config.PSQL_USER,
-            password=config.PSQL_PASSWORD,
-            database=config.PSQL_DB_NAME,
-        )
-        with connection.cursor() as cursor:
-            cursor.execute(queries_sql.query_collections_select_ByUserID.fromat(user_id))
-            collections = cursor.fetchall()
-            return collections
-    except psycopg2.Error as error:
-        print(text.info_colletions_error.format(error))
-        return None
-
-    finally:
-        if connection:
-            connection.close()
-
-def get_notes(collection_id):
-    try:
-        connection = psycopg2.connect(
-            host=config.PSQL_HOST,
-            user=config.PSQL_USER,
-            password=config.PSQL_PASSWORD,
-            database=config.PSQL_DB_NAME,
-        )
-
-        with connection.cursor() as cursor:
-            cursor.execute(queries_sql.query_notes_select_ByCollectionID.format(collection_id))
-            notes = cursor.fetchall()
-            return notes
-
-    except psycopg2.Error as error:
-        print(text.info_notes_error.format(error))
-        return None
-
-    finally:
-        if connection:
-            connection.close()
