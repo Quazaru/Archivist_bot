@@ -12,7 +12,13 @@ import psycopg2
 
 # local files
 import config
-from handlers import router
+
+from handlers import collections_handler, notes_handler, files_handler, commands_handler, menu_handler
+from handlers.collections_handler import collections_router
+from handlers.notes_handler import notes_router
+from handlers.files_handler import files_router
+from handlers.commands_handler import commands_router
+from handlers.menu_handler import menu_router
 import utils_sql
 
 db_handler = None
@@ -29,7 +35,11 @@ if db_connected:
     async def main():
         bot = Bot(token=config.BOT_TOKEN, parse_mode=ParseMode.HTML)
         dp = Dispatcher(storage=MemoryStorage())
-        dp.include_router(router) 
+        dp.include_router(menu_handler.menu_router)
+        dp.include_router(commands_handler.commands_router)
+        dp.include_router(collections_handler.collections_router)
+        dp.include_router(notes_handler.notes_router)
+        dp.include_router(files_handler.files_router) 
         await bot.delete_webhook(drop_pending_updates=True)
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
 

@@ -8,7 +8,7 @@ query_database_init = """
                 CREATE TABLE IF NOT EXISTS Collections (
                     "CollectionID" SERIAL PRIMARY KEY,
                     "Name" VARCHAR(50) NOT NULL,
-                    "CreationTime" VARCHAR(20) NOT NULL,
+                    "CreationTimestamp" FLOAT NOT NULL,
                     "UserID" BIGINT NOT NULL,
                     CONSTRAINT collection_user_fk
                     FOREIGN KEY ("UserID") REFERENCES Users ("UserID")
@@ -17,7 +17,7 @@ query_database_init = """
                 CREATE TABLE IF NOT EXISTS Notes (
                     "NoteID" SERIAL PRIMARY KEY,
                     "Name" VARCHAR(50) NOT NULL,
-                    "CreationTime" VARCHAR(20) NOT NULL,
+                    "CreationTimestamp" FLOAT NOT NULL,
                     "NoteText" TEXT,
                     "CollectionID" INTEGER NOT NULL,
                     CONSTRAINT note_collection_fk
@@ -68,24 +68,21 @@ query_notes_select_ByCollectionID = """
 class QueryHelper:
     query_insert = """
             INSERT INTO {0} ({1})
-            VALUES 
-                ({2});
+            VALUES ({2});
             """
     query_select = """
             SELECT * FROM {0} WHERE {1};
-                """
-    query_select_template = """
-            SELECT * FROM {0}
-                """
+            """
+    query_select_template = """ SELECT * FROM {0} """
     query_select_sorted = """
             SELECT * FROM {0} ORDER BY {1} {2};
-                """
+            """
     query_update = """
             UPDATE {0} SET {1} WHERE {2};
-                """
+            """
     query_delete = """
             DELETE {0} WHERE {1};
-                """
+            """
     
     
     def generate_query_insert(self, tableName, insert_dict):
@@ -112,7 +109,7 @@ class QueryHelper:
         return query_insert
 
     ###    
-    def generate_query_select_new(self, tableName, condition_tuple=(), orderByField="", isDESC=False):
+    def generate_query_select(self, tableName, condition_tuple=(), orderByField="", isDESC=False):
         """
         Функция для генерации SQL-запроса SELECT с дополнительными параметрами
         Принимает аргументы:
@@ -121,38 +118,14 @@ class QueryHelper:
           - orderByField: поле для сортировки (по умолчанию пустая строка)
           - isDESC: флаг сортировки в порядке убывания (по умолчанию False)
           """
-        query = self.query_select_template.format({tableName})
+        query = self.query_select_template.format(tableName)
         if(condition_tuple):
-            query += " WHERE " + self.getConditionStr(condition_tuple=condition_tuple)
+            query += "WHERE " + self.getConditionStr(condition_tuple=condition_tuple)
         if(orderByField):
             DESC = "DESC" if isDESC else ""
-            query+= " ORDER BY {orderByField} {DESC}"
+            query+= f"\nORDER BY {orderByField} {DESC}"
         return query+";"
     ###
-    def generate_query_select(self, tableName, condition_tuple):
-        """
-        Создает строку запроса SELECT для выборки данных из указанной таблицы с условием.
-
-        Аргументы:
-        - tableName (str): Имя таблицы для выборки данных.
-        - conditionTuple (tuple): Кортеж с условиями для фильтрации данных в формате
-                                  (поле, оператор, значение) для каждого условия.
-
-        Возвращает:
-        - str: Строка запроса SELECT, которая выбирает все столбцы (*) из указанной таблицы,
-               применяя указанное условие к данным.
-
-        Пример использования:
-        >>> query_helper = QueryHelper()
-        >>> condition = (('Age', '>', 30), ('City', '=', 'New York'))
-        >>> table_name = 'Users'
-        >>> query = query_helper.generate_query_select(table_name, condition)
-        """
-        conditionStr = self.getConditionStr(condition_tuple)
-
-        query_select  = self.query_select.format(tableName, conditionStr)
-
-        return query_select
     def generate_query_update(self, tableName, update_dict, conditionTuple):
         """
         Создает строку запроса UPDATE для обновления данных в указанной таблице с заданными условиями.
@@ -227,7 +200,7 @@ class QueryHelper:
 
         for idx, (field, operator, value) in enumerate(condition_tuple):
             if isinstance(value, int) or isinstance(value, float):
-                condition = f"\"{field}\" {operator} '{value}'"
+                condition = f"\"{field}\" {operator} {value}"
             else:
                 condition = f"\"{field}\" {operator} '{value}'"
             conditions.append(condition)
